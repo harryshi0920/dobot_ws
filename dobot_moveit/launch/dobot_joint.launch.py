@@ -6,7 +6,7 @@ import os
 
 
 def generate_launch_description():
-    robot_type = os.getenv("DOBOT_TYPE", "cr5")
+    robot_type = os.getenv("DOBOT_TYPE", "cr10")
 
     # robot_type 参数
     robot_type_arg = DeclareLaunchArgument(
