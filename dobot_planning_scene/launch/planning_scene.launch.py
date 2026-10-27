@@ -10,6 +10,7 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
 
+    # 启动ros2 launch dobot_moveit dobot_moveit.launch.py
     moveit_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(

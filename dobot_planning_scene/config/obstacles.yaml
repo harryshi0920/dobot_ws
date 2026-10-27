@@ -1,0 +1,33 @@
+# 规划场景障碍物配置
+# frame_id: 障碍物所在坐标系（launch 中可通过 frame_id 参数覆盖）
+# objects: 障碍物列表
+#   box 类型:  size = [长, 宽, 高]（不需要 STL 文件）
+#   mesh 类型: resource 指向 STL 文件（需放入 meshes/ 目录，
+#             建议使用 package://dobot_planning_scene/meshes/xxx.stl 写法）
+
+frame_id: base_link
+
+objects:
+  - id: table
+    type: box
+    size: [0.6, 0.6, 0.03]
+    position: [0.0, 0.0, -0.015]
+    orientation: [0.0, 0.0, 0.0, 1.0]
+
+  - id: box_1
+    type: box
+    size: [0.05, 0.05, 0.10]
+    position: [0.15, -0.10, 0.05]
+    orientation: [0.0, 0.0, 0.0, 1.0]
+
+  - id: box_2
+    type: box
+    size: [0.05, 0.05, 0.08]
+    position: [0.20, 0.12, 0.04]
+    orientation: [0.0, 0.0, 0.0, 1.0]
+
+  - id: support
+    type: mesh
+    resource: package://dobot_planning_scene/meshes/support.STL
+    position: [0.1, 0.1, -0.1]
+    orientation: [0.0, 0.0, 0.0, 1.0]
