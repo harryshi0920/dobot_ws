@@ -16,14 +16,14 @@ def generate_launch_description():
             os.path.join(
                 get_package_share_directory('dobot_moveit'),
                 'launch',
-                'dobot_moveit.launch.py'
+                'moveit_demo.launch.py'
             )
         )
     )
 
     scene_loader = Node(
         package='dobot_planning_scene',
-        executable='add_scene',
+        executable='random_scene',
         name='planning_scene_loader',
         output='screen',
         parameters=[

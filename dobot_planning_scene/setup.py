@@ -32,7 +32,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'add_scene = dobot_planning_scene.add_scene:main',
+            'random_scene = dobot_planning_scene.random_scene:main',
         ],
     },
 )
