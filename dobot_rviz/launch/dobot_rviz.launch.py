@@ -14,7 +14,7 @@ def generate_launch_description():
     default_rviz_config_path = str(urdf_tutorial_path / 'rviz/urdf.rviz')
 
     gui_arg = DeclareLaunchArgument(
-        name='gui', default_value='false', choices=['true', 'false'],
+        name='gui', default_value='true', choices=['true', 'false'],
         description='Flag to enable joint_state_publisher_gui')
     model_arg = DeclareLaunchArgument(
         name='model', default_value=default_model_path,

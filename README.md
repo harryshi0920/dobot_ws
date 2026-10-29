@@ -1,295 +1,124 @@
-<div align="center">
+ <h1>ECE 780 Project</h1>
 
- <img src="image/dobot_moveit.jpg" alt="DOBOT 6Axis ROS2 V4" style="max-width: 600px; margin-bottom: 20px;" />
+`dobot_planning_scene` 是在Dobot官方ROS2包上新添加的包， 当前实现通过 `/apply_planning_scene` 服务一次性添加 **10 个随机球形障碍物**。
 
- <h1>DOBOT 6Axis ROS2 V4</h1>
+## 目录结构
 
- **Dobot Robotics ROS2 Software Development Kit**  
- High-performance robot control framework based on TCP/IP protocol
+```text
+dobot_planning_scene/
+├── config/
+│   └── obstacles.yaml          # 预留的箱体、网格障碍物配置
+├── dobot_planning_scene/
+│   ├── random_scene.py        # 生成随机场景并调用 MoveIt 服务
+│   └── spheres_generator.py   # 构造球形 CollisionObject
+├── launch/
+│   └── planning_scene.launch.py
+├── meshes/
+│   └── support.STL            # 预留的支架模型
+├── package.xml
+├── setup.cfg
+└── setup.py
+```
 
- [English](README.md) · [简体中文](README_ZH.md)
+## 环境与编译
 
- [![Platform](https://img.shields.io/badge/Platform-Ubuntu%2022.04-blue?style=flat-square)](https://ubuntu.com/download/server)
- [![ROS](https://img.shields.io/badge/ROS2-Humble-green?style=flat-square)](https://docs.ros.org/en/humble/)
- [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
+以下命令以 ROS 2 Humble、工作空间 `~/dobot_ws` 和 CR10 模型为例。需要提前安装 ROS 2、MoveIt 2、RViz 2、Git 和 colcon。
 
-</div>
+### 获取源码
 
----
-
-## Quick Start
-
-### System Requirements
-
-| Requirement | Version |
-|-------------|---------|
-| OS | Ubuntu 22.04 LTS |
-| ROS Version | ROS2 Humble |
-| Python | 3.8+ |
-
-### Network Configuration
-
-| Configuration | Description |
-|---------------|-------------|
-| Robot IP | 192.168.5.1 (must be in the same subnet) |
-| Control Port | 29999 |
-| Feedback Port | 30004 |
-
-### Installation
+在新环境中创建工作空间，并克隆本项目的 `2026_10_27` 分支（当前开发分支，包含 `dobot_planning_scene`）：
 
 ```bash
-# Create workspace
 mkdir -p ~/dobot_ws/src
 cd ~/dobot_ws/src
-git clone -b feature/v4-optimization https://github.com/Dobot-Arm/DOBOT_6Axis_ROS2_V4.git
+git clone --branch 2026_10_27 https://github.com/harryshi0920/dobot_ws.git DOBOT_6Axis_ROS2_V4
+```
+
+仓库本身包含各个 ROS 2 功能包，因此放在工作空间的 `src/DOBOT_6Axis_ROS2_V4` 下。本文档位于仓库根目录，规划场景包位于 `dobot_planning_scene/` 子目录。
+
+### 编译工作空间
+在工作空间根目录编译：
+
+```bash
 cd ~/dobot_ws
-
-# Install dependencies
-sudo apt update && sudo apt install -y \
-  ros-humble-moveit \
-  ros-humble-gazebo-* \
-  ros-humble-joint-state-publisher \
-  ros-humble-robot-state-publisher
-
-# Build
-colcon build
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install
 source install/setup.bash
-
-# Configure robot connection IP (default for wired connection)
-echo "export IP_address=192.168.5.1" >> ~/.bashrc
-
-# Specify robot model (choose according to actual model)
-# Example: CR5 model
-echo "export DOBOT_TYPE=cr5" >> ~/.bashrc
-# Supported models: CR3, CR5, CR7, CR10, CR12, CR16, CR20, E6 (ME6), CR10AF, Nova2, Nova5, CR30H
-
-# Apply configuration
-source ~/.bashrc
 ```
 
----
-
-## Usage
-
-### 1. RViz Visualization (Standalone)
-
-Visualize the robot model without a physical robot:
+如果已经完成整个工作空间的编译，后续只修改本包时可以使用：
 
 ```bash
-ros2 launch dobot_rviz dobot_rviz.launch.py
+colcon build --symlink-install --packages-select dobot_planning_scene
+source install/setup.bash
 ```
 
-### 2. RViz with Real Robot
+新增模型或配置文件后，需要重新构建本包以更新安装目录中的资源。
 
-Stream live joint states from the physical robot into RViz:
+## 启动方法
+
+### 一键启动 MoveIt 演示和障碍物
 
 ```bash
-# Terminal 1: Connect to robot
-ros2 launch dobot_bringup_v4 dobot_bringup_ros2.launch.py
-
-# Terminal 2: RViz with live hardware mode
-ros2 launch dobot_rviz dobot_rviz.launch.py live_hardware:=true
+cd ~/dobot_ws
+source install/setup.bash
+ros2 launch dobot_planning_scene planning_scene.launch.py
 ```
 
-### 3. MoveIt Virtual Demo
+此 launch 文件会依次包含以下启动动作：
 
-Test motion planning in RViz with a virtual controller (no robot required):
+1. 通过 `dobot_moveit/moveit_demo.launch.py` 启动 `${DOBOT_TYPE}_moveit/demo.launch.py`。
+2. 启动随机场景节点，等待 `/apply_planning_scene` 服务可用后提交障碍物。
+
+两者的初始化没有固定延时，场景节点通过等待服务来配合 MoveIt 启动。此入口使用 MoveIt 演示配置，不会启动本仓库的真机通信驱动。
+
+成功后会看到日志：
+
+```text
+Random spheres generate successfully
+```
+
+场景节点在服务返回后退出，这是正常行为；MoveIt 和 RViz 仍继续运行。在 RViz 的 MotionPlanning 显示中启用场景几何体显示，即可观察球形障碍物并尝试规划。
+
+### 向已经运行的 MoveIt 添加障碍物
+
+如果 MoveIt 已经启动且提供 `/apply_planning_scene` 服务，只需在已加载 ROS 2 和工作空间环境的终端执行：
 
 ```bash
-ros2 launch dobot_moveit moveit_demo.launch.py
+ros2 run dobot_planning_scene random_scene
 ```
 
-### 4. MoveIt with Real Robot
+独立运行时默认节点名为 `random_scene`；使用本包 launch 启动时，节点名为 `planning_scene_loader`。
 
-Full motion planning and execution on the physical robot:
+## 随机场景的生成规则
+`spheres_generator.py`为生成球体function，`random_scene.py`包含随即算法
 
-```bash
-# Terminal 1: Connect to robot
-ros2 launch dobot_bringup_v4 dobot_bringup_ros2.launch.py
+所有球体都使用 `base_link` 坐标系，长度单位为米。
 
-# Terminal 2: MoveIt control interface
-ros2 launch dobot_moveit dobot_moveit.launch.py
-```
+| 配置项 | 当前值 | 代码位置 |
+| --- | --- | --- |
+| 球体数量 | `10` | `random_scene.py` 中的 `main()` |
+| 随机种子 | `None`，每次随机生成 | `random_scene.py` 中的 `main()` |
+| 半径 | `0.05`～`0.2` | `generate_random_spheres()` |
+| 球心 X | `-1.3`～`1.3` | `generate_random_spheres()` |
+| 球心 Y | `-0.5`～`0.5` | `generate_random_spheres()` |
+| 球心 Z | `0.1`～`0.5` | `generate_random_spheres()` |
+| 障碍物 ID | `sphere_0`～`sphere_9` | `generate_random_spheres()` |
+| 坐标系 | `base_link` | `spheres_generator.py` |
 
-### 5. Gazebo + MoveIt Co-Simulation
+这些设置目前是 Python 代码中的常量，**尚未提供对应的 ROS 参数或 launch 参数**。如需固定场景，可将 `main()` 中的 `random_seed` 改为固定整数；如需改变数量或分布范围，修改对应代码后重新构建并加载工作空间环境。
 
-Physics simulation with motion planning:
+随机生成过程不会检查球体之间或球体与机器人之间是否相交，也不会保证目标点一定可达。场景导致规划失败时，可调整分布范围或数量，或重新运行节点生成场景。
 
-```bash
-# Terminal 1: Launch Gazebo with MoveIt controllers
-ros2 launch dobot_gazebo gazebo_moveit.launch.py
+## LOG
+### 2026-10-27
+1. 更改ompl_planning.yaml为github上 moveit/moveit_resource/blob/humble/panda_moveit_config/config/ompl_planning.yaml中的结构。原ompl_planning.yaml会使MoveitConfigsBuilder自动在外面包一层ompl
+2. 更改URDF的joint limit，原代码中的joint limit设置为+-360。更改为+-180
 
-# Terminal 2: Launch MoveIt control interface
-ros2 launch dobot_moveit moveit_gazebo.launch.py
-```
+### 2026-10-28
+1. 增加dobot_planning_scene/dobot_planning_scene/spheres_generator.py和random_scene.py
 
-### 6. Motion Demo Scripts
+## Future Work
+1. 更改random_scene.py中的生成算法，相比较与提取小球的物理碰撞的方式检测个规避小球之间相互叠加和小球与机械臂的碰撞。建议使用算法使小球分布均匀的同时，规避生成在机械臂现有区域直接穿模。
 
-Run pre-built motion demos for quick testing:
 
-```bash
-# Terminal 1: Connect to robot first
-ros2 launch dobot_bringup_v4 dobot_bringup_ros2.launch.py
-
-# Terminal 2: Run basic motion demo (MovJ/MovL/DO control)
-ros2 run dobot_demo demo
-```
-
-### 7. Servo Action Client
-
-Test joint trajectory control via action client (sends single-point trajectory goals periodically):
-
-```bash
-# Terminal 1: Connect to robot
-ros2 launch dobot_bringup_v4 dobot_bringup_ros2.launch.py
-
-# Terminal 2: Start MoveIt action server
-ros2 launch dobot_moveit dobot_moveit.launch.py
-
-# Terminal 3: Run action client (sends single-point goals every second)
-ros2 run servo_action action_move_client
-```
-
----
-
-## Launch Parameters
-
-The following parameters apply to `dobot_rviz.launch.py`:
-
-| Parameter | Default Value | Description |
-|-----------|---------------|-------------|
-| `live_hardware` | `false` | Set to `true` to get joint states from a real robot |
-| `gui` | `false` | Enable `joint_state_publisher_gui` for manual joint control |
-| `model` | Auto | Path to robot URDF file (auto-generated based on `DOBOT_TYPE`) |
-
-### Environment Variables
-
-In addition to launch parameters, the project also supports the following environment variables:
-
-| Environment Variable | Default Source | Description |
-|---------------------|---------------|-------------|
-| `DOBOT_TYPE` | `param.json` | Robot type (e.g., `cr5`, `cr10`, `nova2`) |
-| `IP_address` | `param.json` | Robot IP address (for real robot connection) |
-
----
-
-## Project Structure
-
-```
-DOBOT_6Axis_ROS2_V4/
-├── dobot_bringup_v4/        # Robot driver (TCP/IP communication)
-├── dobot_moveit/            # MoveIt action server & utilities
-├── dobot_rviz/              # RViz visualization launcher
-├── dobot_gazebo/            # Gazebo simulation
-├── dobot_demo/              # Simple motion demo scripts
-├── dobot_msgs_v4/           # ROS2 service & message definitions
-├── servo_action/            # Joint trajectory action client
-├── cr3_moveit/              # CR3 MoveIt config
-├── cr5_moveit/              # CR5 MoveIt config
-├── cr7_moveit/              # CR7 MoveIt config
-├── cr10_moveit/             # CR10 MoveIt config
-├── cr10af_moveit/           # CR10AF MoveIt config
-├── cr12_moveit/             # CR12 MoveIt config
-├── cr16_moveit/             # CR16 MoveIt config
-├── cr20_moveit/             # CR20 MoveIt config
-├── cr30h_moveit/            # CR30H MoveIt config
-├── me6_moveit/              # E6/ME6 MoveIt config
-├── nova2_moveit/            # Nova2 MoveIt config
-├── nova5_moveit/            # Nova5 MoveIt config
-├── cra_description/         # Robot URDF/XACRO descriptions & meshes
-├── image/                   # Images
-├── README.md
-└── README_ZH.md
-```
-
----
-
-## Architecture & Data Flow
-
-### MoveIt + Real Robot
-
-```
-dobot_bringup_v4 (main.cpp)
-  └→ /joint_states_robot  (10Hz, radians, from port 30004 feedback)
-       └→ joint_state_relay (--robot mode)
-            ├→ /joint_states           → MoveIt current_state_monitor (planning start state)
-            └→ /rsp_joint_states       → robot_state_publisher  → TF  → RViz
-
-MoveIt (OMPL / CHOMP planner)
-  └→ FollowJointTrajectory Action
-       └→ action_move_server (dobot_moveit package)
-            └→ ServoJ service (per waypoint)  → dobot_bringup_v4  → TCP  → robot
-```
-
-### Key Components
-
-| Component | Package | Role |
-|-----------|---------|------|
-| `main.cpp` | `dobot_bringup_v4` | TCP 30004 realtime feedback → `/joint_states_robot` |
-| `joint_state_relay.py` | `dobot_rviz` | Bridge `/joint_states_robot` → `/joint_states`; relay → `/rsp_joint_states` |
-| `action_move_server.py` | `dobot_moveit` | Receives MoveIt trajectory, sends ServoJ commands waypoint-by-waypoint |
-| `cra_description` | `cra_description` | Robot URDF/XACRO descriptions and STL meshes for all models |
-| `ompl_planning.yaml` | `{model}_moveit` | OMPL planner config (includes `AddTimeOptimalParameterization`) |
-
----
-
-## Supported Models
-
-| Series | Models |
-|--------|--------|
-| CR Series | CR3, CR5, CR7, CR10, CR12, CR16, CR20, CR30H |
-| CRAF Series | CR10AF |
-| E Series | E6 / ME6 |
-| Nova Series | Nova2, Nova5 |
-
----
-
-## Launch Files Reference
-
-| Launch File | Description |
-|-------------|-------------|
-| `dobot_rviz.launch.py` | RViz visualization (standalone or with `live_hardware:=true`) |
-| `dobot_bringup_ros2.launch.py` | Robot driver — TCP/IP connection to physical robot |
-| `moveit_demo.launch.py` | MoveIt motion planning demo (virtual) |
-| `dobot_moveit.launch.py` | MoveIt control interface (real robot) |
-| `dobot_gazebo.launch.py` | Gazebo physics simulation (without controllers) |
-| `gazebo_moveit.launch.py` | Gazebo + MoveIt co-simulation (with controllers) |
-| `dobot_joint.launch.py` | MoveIt action server (real robot) |
-
-## Demo & Utilities Reference
-
-| Package | Executable | Description |
-|---------|------------|-------------|
-| `dobot_demo` | `demo` | Basic motion demo (MovJ/MovL/DO control) |
-| `servo_action` | `action_move_client` | Joint trajectory action client (single-point goals every 1s) |
-| `servo_action` | `Joint_Position` | Fake joint state publisher for simulation testing |
-
----
-
-## Notes
-
-> ⚠️ **Safety First**: Ensure the robot is in a safe position before operation
-
-1. Ensure computer IP is in the same subnet as robot (192.168.X.X)
-2. Ensure ports 29999 and 30004 are not occupied
-3. Robot must be in remote TCP/IP control mode
-
----
-
-## Version Information
-
-| Information | Content |
-|-------------|---------|
-| Current Version | V4.6.5 |
-| ROS Version | ROS2 Humble |
-| Protocol Version | Dobot TCP/IP V4.6.5 |
-
----
-
-## License
-
-[MIT License](LICENSE)
-
-<div align="center">
-Built by Dobot-Arm
-</div>
